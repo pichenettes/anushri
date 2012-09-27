@@ -74,8 +74,7 @@ inline void FlushMidiOut() {
 
 inline void PollMidiIn() {
   if (midi_io.readable()) {
-    uint16_t byte = midi_io.ImmediateRead();
-    midi_in_buffer.NonBlockingWrite(byte);
+    midi_in_buffer.NonBlockingWrite(midi_io.ImmediateRead());
   }
 }
 
