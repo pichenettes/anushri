@@ -184,6 +184,7 @@ void Ui::LockPots(bool snap) {
   memset(adc_thresholds_, 16, kNumSoftPots);
   memset(snapped_, !snap, kNumSoftPots);
   memset(snap_position_cache_, 0xff, sizeof(snap_position_cache_));
+  display_snap_delta_ = 0;
 }
 
 /* static */
