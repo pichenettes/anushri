@@ -139,7 +139,9 @@ class Voice {
   const DACState& dac_state() const { return dac_state_; }
   
   inline int16_t dco_pitch() const { return dco_pitch_; }
-  inline uint8_t gate() const { return vca_envelope_.gate(); }
+  inline bool gate() const { return vca_envelope_.gate(); }
+  inline bool retriggered() const { return retriggered_; }
+  inline void ClearRetriggeredFlag() { retriggered_ = false; }
   inline uint8_t lfo() const { return lfo_8_bits_; }
   inline bool at_rest() const {
     return vca_envelope_.segment() == ENV_SEGMENT_DEAD;
@@ -209,6 +211,7 @@ class Voice {
   
   bool locked_;
   bool dirty_;
+  bool retriggered_;
   
   uint8_t lfo_8_bits_;
   
@@ -227,9 +230,10 @@ class Voice {
   int16_t pitch_source_;
   int16_t pitch_target_;
   int16_t pitch_;
+  
   int16_t mod_pitch_bend_;
-  uint8_t mod_pitch_wheel_;
-  uint8_t mod_growl_wheel_;
+  uint8_t mod_wheel_;
+  uint8_t mod_wheel_2_;
   uint8_t mod_aftertoutch_;
   uint8_t mod_velocity_;
   uint8_t mod_accent_;

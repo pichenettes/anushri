@@ -72,6 +72,7 @@ void Voice::Init() {
   pitch_ = 0;
   locked_ = false;
   dirty_ = false;
+  retriggered_ = false;
   volume_ = 240;
 
   ResetAllControllers();
@@ -79,25 +80,17 @@ void Voice::Init() {
 }
 
 void Voice::ControlChange(uint8_t controller, uint8_t value) {
-  uint8_t vibrato_destination = patch_.vibrato_destination;
   switch (controller) {
     case midi::kVolume:
       volume_ = value << 1;
       break;
       
     case midi::kModulationWheelMsb:
-      if (vibrato_destination < 128) {
-        mod_pitch_wheel_ = value;
-        mod_growl_wheel_ = U8U8MulShift8(vibrato_destination << 1, value);
-      } else {
-        vibrato_destination = ~vibrato_destination;
-        mod_growl_wheel_ = value;
-        mod_pitch_wheel_ = U8U8MulShift8(vibrato_destination << 1, value);
-      }
+      mod_wheel_ = value;
       break;
       
     case midi::kBreathController:
-      mod_growl_wheel_ = value;
+      mod_wheel_2_ = value;
       break;
     
   }
@@ -163,8 +156,8 @@ void Voice::AllSoundOff() {
 
 void Voice::ResetAllControllers() {
   mod_pitch_bend_ = 8192;
-  mod_pitch_wheel_ = 0;
-  mod_growl_wheel_ = 0;
+  mod_wheel_ = 0;
+  mod_wheel_2_ = 0;
   mod_aftertoutch_ = 0;
 }
 
@@ -185,6 +178,19 @@ void Voice::WriteDACStateSample() {
   vibrato_lfo_.set_phase_increment(
       pgm_read_dword(lut_res_lfo_increments + 96 + (patch_.vibrato_rate >> 1)));
 
+  uint8_t mod_wheel_pitch = 0;
+  uint8_t mod_wheel_growl = 0;
+  uint8_t vibrato_destination = patch_.vibrato_destination;
+  if (vibrato_destination < 128) {
+    mod_wheel_pitch = mod_wheel_;
+    mod_wheel_growl = U8U8MulShift8(vibrato_destination << 1, mod_wheel_);
+  } else {
+    vibrato_destination = ~vibrato_destination;
+    mod_wheel_growl = mod_wheel_;
+    mod_wheel_pitch = U8U8MulShift8(vibrato_destination << 1, mod_wheel_);
+  }
+  
+
   // Compute modulation sources.
   uint16_t lfo_unsigned = lfo_.Render();
   int16_t lfo = lfo_unsigned - 32768;
@@ -203,7 +209,7 @@ void Voice::WriteDACStateSample() {
   pitch += (mod_pitch_bend_ - 8192) >> 5;
   pitch += S8U8Mul(patch_.vco_dco_range, 6) << 8;
   pitch += patch_.vco_dco_fine;
-  pitch += S8U8MulShift8(vibrato_lfo >> 8, mod_pitch_wheel_);
+  pitch += S8U8MulShift8(vibrato_lfo >> 8, mod_wheel_pitch);
   dco_pitch_ = pitch;
   
   pitch += S8U8Mul(patch_.vco_detune, 128);
@@ -235,9 +241,13 @@ void Voice::WriteDACStateSample() {
   int16_t cutoff = 60 * 128;
   cutoff += S16U8MulShift8(dco_pitch_ - 60 * 128, patch_.cutoff_tracking) << 1;
   cutoff += S8U8Mul(patch_.cutoff_bias + 128, 64);
-  uint8_t growl_amount = mod_growl_wheel_;
+  uint16_t growl_amount = mod_wheel_growl;
+  growl_amount += mod_wheel_2_;
   if (mod_aftertoutch_ > 112) {
     growl_amount += (mod_aftertoutch_ - 112) << 2;
+  }
+  if (growl_amount >= 255) {
+    growl_amount = 255;
   }
   cutoff += S16U8MulShift8(vibrato_lfo, growl_amount) >> 3;
   uint16_t env_amount = patch_.cutoff_env_amount + (mod_accent_ >> 1);
@@ -267,6 +277,9 @@ void Voice::GateOn() {
   vca_envelope_.Trigger(ENV_SEGMENT_ATTACK);
   vcf_envelope_.Trigger(ENV_SEGMENT_ATTACK);
   mod_envelope_.Trigger(ENV_SEGMENT_ATTACK);
+  if (gate()) {
+    retriggered_ = true;
+  }
 }
 
 void Voice::GateOff() {
