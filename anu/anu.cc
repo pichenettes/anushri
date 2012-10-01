@@ -154,9 +154,11 @@ ISR(TIMER0_OVF_vect, ISR_NOBLOCK) {
   
   // Writes to the output shift register (LED and Gate/Trig).
   uint8_t out = ui.led_pattern();
-  if (voice_controller.voice().gate()) {
+  if (voice_controller.voice().gate() &&
+      !voice_controller.voice().retriggered()) {
     out |= _BV(OUTPUT_GATE);
   }
+  voice_controller.mutable_voice()->ClearRetriggeredFlag();
   if (voice_controller.clock_pulse()) {
     out |= _BV(OUTPUT_TRIG);
     voice_controller.ClearClockPulse();

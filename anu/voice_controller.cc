@@ -208,9 +208,8 @@ void VoiceController::NoteOn(uint8_t note, uint8_t velocity) {
         // If the arpeggiator is off, actually trigger the note!
         voice_.NoteOn(note, velocity, 0, 0, pressed_keys_.size() != 1);
       } else {
-        if (pressed_keys_.size() == 1) {
+        if (pressed_keys_.size() == 1 && !sequencer_running_) {
           StartArpeggiator();
-          StartDrumMachine();
         }
       }
     }
@@ -333,13 +332,9 @@ void VoiceController::Clock(bool midi_generated) {
   voice_.set_lfo_pll_target_phase(lfo_sync_counter_);
   if (clock_counter_ >= clock_divisions[system_settings.clock_ppqn()]) {
     clock_counter_ = 0;
-    if (has_arpeggiator()) {
-      ClockArpeggiator();
-      ClockDrumMachine();
-    } else if (sequencer_running_) {
-      ClockSequencer();
-      ClockDrumMachine();
-    }
+    ClockArpeggiator();
+    ClockSequencer();
+    ClockDrumMachine();
   }
   midi_dispatcher.OnClock(midi_generated);
 }
@@ -373,7 +368,9 @@ void VoiceController::StartArpeggiator() {
       seq_settings_.arp_direction() == ARPEGGIO_DIRECTION_DOWN ? -1 : 1;
   ResetArpeggiatorPattern();
   ClockArpeggiator();
-  midi_dispatcher.OnStart();
+  if (!sequencer_running_) {
+    midi_dispatcher.OnStart();
+  }
 }
 
 /* static */
@@ -398,7 +395,9 @@ void VoiceController::StopArpeggiator() {
   AllNotesOff();
   midi_dispatcher.OnInternalNoteOff(previous_generated_note_);
   previous_generated_note_ = 0xff;
-  midi_dispatcher.OnStop();
+  if (!sequencer_running_) {
+    midi_dispatcher.OnStop();
+  }
 }
 
 /* static */
@@ -498,46 +497,48 @@ const prog_uint8_t accent_level[] PROGMEM = {
 
 /* static */
 void VoiceController::ClockArpeggiator() {
-  uint16_t pattern = pgm_read_word(
-      lut_res_arpeggiator_patterns + seq_settings_.arp_pattern);
-  uint8_t has_arpeggiator_note = (arp_pattern_mask_ & pattern) ? 255 : 0;
+  if (has_arpeggiator()) {
+    uint16_t pattern = pgm_read_word(
+        lut_res_arpeggiator_patterns + seq_settings_.arp_pattern);
+    uint8_t has_arpeggiator_note = (arp_pattern_mask_ & pattern) ? 255 : 0;
 
-  // Trigger notes only if the arp is on, and if keys are pressed.
-  if (has_arpeggiator_note) {
-    StepArpeggiator();
-    const NoteEntry& arpeggio_note = pressed_keys_.sorted_note(arp_step_);
-    uint8_t note = arpeggio_note.note;
-    uint8_t velocity = arpeggio_note.velocity;
-    note += 12 * arp_octave_;
-    while (note > 127) {
-      note -= 12;
-    }
-    uint8_t random = Random::GetByte();
-    uint8_t slide_threshold = U8U8Mul(
-        pgm_read_byte(slide_probability + arp_pattern_step_),
-        seq_settings_.acidity);
-    // Slide less frequently to first note.
-    if (arp_step_ == 0) {
-      slide_threshold >>= 1;
-    }
-    uint8_t accent = U8U8Mul(
-        pgm_read_byte(accent_level + arp_pattern_step_),
-        seq_settings_.acidity) >> 1;
-    accent = (accent + U8U8MulShift8(accent, random)) >> 1;
-    bool slid = random < slide_threshold;
-    if (!slid) {
+    // Trigger notes only if the arp is on, and if keys are pressed.
+    if (has_arpeggiator_note) {
+      StepArpeggiator();
+      const NoteEntry& arpeggio_note = pressed_keys_.sorted_note(arp_step_);
+      uint8_t note = arpeggio_note.note;
+      uint8_t velocity = arpeggio_note.velocity;
+      note += 12 * arp_octave_;
+      while (note > 127) {
+        note -= 12;
+      }
+      uint8_t random = Random::GetByte();
+      uint8_t slide_threshold = U8U8Mul(
+          pgm_read_byte(slide_probability + arp_pattern_step_),
+          seq_settings_.acidity);
+      // Slide less frequently to first note.
+      if (arp_step_ == 0) {
+        slide_threshold >>= 1;
+      }
+      uint8_t accent = U8U8Mul(
+          pgm_read_byte(accent_level + arp_pattern_step_),
+          seq_settings_.acidity) >> 1;
+      accent = (accent + U8U8MulShift8(accent, random)) >> 1;
+      bool slid = random < slide_threshold;
+      if (!slid) {
+        midi_dispatcher.OnInternalNoteOff(previous_generated_note_);
+      }
+      voice_.NoteOn(note, velocity, slid ? 0x60 : 0, accent, slid);
+      if (slid) {
+        midi_dispatcher.OnInternalNoteOff(previous_generated_note_);
+      }
+      midi_dispatcher.OnInternalNoteOn(note, velocity);
+      previous_generated_note_ = note;
+    } else {
+      voice_.NoteOff(previous_generated_note_);
       midi_dispatcher.OnInternalNoteOff(previous_generated_note_);
+      previous_generated_note_ = 0xff;
     }
-    voice_.NoteOn(note, velocity, slid ? 0x60 : 0, accent, slid);
-    if (slid) {
-      midi_dispatcher.OnInternalNoteOff(previous_generated_note_);
-    }
-    midi_dispatcher.OnInternalNoteOn(note, velocity);
-    previous_generated_note_ = note;
-  } else {
-    voice_.NoteOff(previous_generated_note_);
-    midi_dispatcher.OnInternalNoteOff(previous_generated_note_);
-    previous_generated_note_ = 0xff;
   }
   ++arp_pattern_step_;
   arp_pattern_mask_ <<= 1;

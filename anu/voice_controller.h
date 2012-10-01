@@ -117,6 +117,7 @@ class VoiceController {
   static inline void Start() {
     StartSequencer();
     StartDrumMachine();
+    StartArpeggiator();
   }
   static inline void Stop() {
     StopSequencer();
@@ -172,8 +173,7 @@ class VoiceController {
     return pressed_keys_.size() == 0 && !sequencer_running_ && voice_.at_rest();
   }
   static inline bool has_drums() {
-    return (sequencer_running_ || has_arpeggiator()) &&
-      seq_settings_.has_drums();
+    return (sequencer_running_ && seq_settings_.has_drums());
   }
   static inline bool has_arpeggiator() {
     return (seq_settings_.arp_mode && pressed_keys_.size());
