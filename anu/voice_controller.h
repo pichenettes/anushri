@@ -115,12 +115,14 @@ class VoiceController {
   static void Clock(bool midi_generated);
   
   static inline void Start() {
+    StartClock();
+    StartArpeggiator();
     StartSequencer();
     StartDrumMachine();
-    StartArpeggiator();
   }
   static inline void Stop() {
     StopSequencer();
+    StopClock();
   }
   
   static inline void InsertRest() {
@@ -204,6 +206,8 @@ class VoiceController {
  private:
   static void ResetArpeggiatorPattern();
 
+  static void StartClock();
+  static void StopClock();
   static void StartArpeggiator();
   static void ClockArpeggiator();
   static void StopArpeggiator();
@@ -238,6 +242,7 @@ class VoiceController {
 
   static bool sequencer_running_;
   static bool sequencer_recording_;
+  static bool clock_running_;
   static uint8_t sequencer_note_;
   static int8_t sequencer_transposition_;
   static uint8_t sequencer_velocity_;

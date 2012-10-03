@@ -41,6 +41,7 @@ uint8_t VoiceController::clock_counter_;
 
 NoteStack<16> VoiceController::pressed_keys_;
 
+bool VoiceController::clock_running_;
 bool VoiceController::sequencer_running_;
 bool VoiceController::sequencer_recording_;
 uint8_t VoiceController::sequencer_note_;
@@ -208,7 +209,8 @@ void VoiceController::NoteOn(uint8_t note, uint8_t velocity) {
         // If the arpeggiator is off, actually trigger the note!
         voice_.NoteOn(note, velocity, 0, 0, pressed_keys_.size() != 1);
       } else {
-        if (pressed_keys_.size() == 1 && !sequencer_running_) {
+        if (pressed_keys_.size() == 1 && !clock_running_) {
+          StartClock();
           StartArpeggiator();
         }
       }
@@ -250,6 +252,9 @@ void VoiceController::NoteOff(uint8_t note) {
       pressed_keys_.NoteOff(note);
       if (pressed_keys_.size() == 0) {
         StopArpeggiator();
+        if (!sequencer_running_) {
+          StopClock();
+        }
       }
     }
   }
@@ -340,27 +345,29 @@ void VoiceController::Clock(bool midi_generated) {
 }
 
 /* static */
+void VoiceController::StartClock() {
+  clock.Reset();
+  clock_counter_ = 0;
+  lfo_sync_counter_ = 0;
+  clock_running_ = true;
+  midi_dispatcher.OnStart();
+}
+
+
+/* static */
 void VoiceController::StartSequencer() {
   AllSoundOff();
   if (sequencer_recording_) {
     StopRecording();
   }
-  clock.Reset();
-  clock_counter_ = 0;
-  lfo_sync_counter_ = 0;
   sequencer_note_ = 0;
   sequencer_running_ = true;
-  
   ClockSequencer();
-  midi_dispatcher.OnStart();
 }
 
 /* static */
 void VoiceController::StartArpeggiator() {
   voice_.AllSoundOff();
-  clock.Reset();
-  clock_counter_ = 0;
-  lfo_sync_counter_ = 0;
   previous_generated_note_ = 0xff;
   arp_pattern_mask_ = 0x1;
   arp_pattern_step_ = 0;
@@ -368,9 +375,6 @@ void VoiceController::StartArpeggiator() {
       seq_settings_.arp_direction() == ARPEGGIO_DIRECTION_DOWN ? -1 : 1;
   ResetArpeggiatorPattern();
   ClockArpeggiator();
-  if (!sequencer_running_) {
-    midi_dispatcher.OnStart();
-  }
 }
 
 /* static */
@@ -382,12 +386,17 @@ void VoiceController::StartDrumMachine() {
 }
 
 /* static */
+void VoiceController::StopClock() {
+  clock_running_ = false;
+  midi_dispatcher.OnStop();
+}
+
+/* static */
 void VoiceController::StopSequencer() {
   AllSoundOff();
   midi_dispatcher.OnInternalNoteOff(previous_generated_note_);
   previous_generated_note_ = 0xff;
   sequencer_running_ = false;
-  midi_dispatcher.OnStop();
 }
 
 /* static */
@@ -395,14 +404,11 @@ void VoiceController::StopArpeggiator() {
   AllNotesOff();
   midi_dispatcher.OnInternalNoteOff(previous_generated_note_);
   previous_generated_note_ = 0xff;
-  if (!sequencer_running_) {
-    midi_dispatcher.OnStop();
-  }
 }
 
 /* static */
 void VoiceController::ClockSequencer() {
-  if (!sequence_.num_notes) {
+  if (!sequence_.num_notes || !sequencer_running_) {
     return;
   }
   
@@ -454,7 +460,7 @@ uint8_t drums_midi_notes[] = { 36, 38, 42 };
 void VoiceController::ClockDrumMachine() {
   uint16_t step_mask = 1 << drum_sequencer_step_;
   uint8_t override_mask = 1;
-  if (seq_settings_.has_drums()) {
+  if (has_drums()) {
     uint8_t x = seq_settings_.drums_x;
     uint8_t y = seq_settings_.drums_y;
     for (uint8_t i = 0; i < kNumDrumParts; ++i) {
