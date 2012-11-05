@@ -356,7 +356,9 @@ void VoiceController::StartClock() {
 
 /* static */
 void VoiceController::StartSequencer() {
-  AllSoundOff();
+  if (!(pressed_keys_.size() && sequence_.num_notes == 0)) {
+    AllSoundOff();
+  }
   if (sequencer_recording_) {
     StopRecording();
   }
