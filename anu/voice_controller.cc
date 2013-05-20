@@ -329,19 +329,21 @@ void VoiceController::AllNotesOff() {
 /* static */
 void VoiceController::Clock(bool midi_generated) {
   clock_pulse_ = 8;
-  ++clock_counter_;
-  ++lfo_sync_counter_;
-  if (lfo_sync_counter_ == 24) {
-    lfo_sync_counter_ = 0;
-  }
   voice_.set_lfo_pll_target_phase(lfo_sync_counter_);
-  if (clock_counter_ >= clock_divisions[system_settings.clock_ppqn()]) {
-    clock_counter_ = 0;
+  if (!clock_counter_)
     ClockArpeggiator();
     ClockSequencer();
     ClockDrumMachine();
   }
   midi_dispatcher.OnClock(midi_generated);
+  ++clock_counter_;
+  if (clock_counter_ >= clock_divisions[system_settings.clock_ppqn()]) {
+    clock_counter_ = 0;
+  }
+  ++lfo_sync_counter_;
+  if (lfo_sync_counter_ == 24) {
+    lfo_sync_counter_ = 0;
+  }
 }
 
 /* static */
@@ -364,7 +366,6 @@ void VoiceController::StartSequencer() {
   }
   sequencer_note_ = 0;
   sequencer_running_ = true;
-  ClockSequencer();
 }
 
 /* static */
@@ -376,13 +377,11 @@ void VoiceController::StartArpeggiator() {
   arp_direction_ = \
       seq_settings_.arp_direction() == ARPEGGIO_DIRECTION_DOWN ? -1 : 1;
   ResetArpeggiatorPattern();
-  ClockArpeggiator();
 }
 
 /* static */
 void VoiceController::StartDrumMachine() {
   drum_sequencer_step_ = 0;
-  ClockDrumMachine();
   // No need to send a MIDI start event since one of the arpeggiator or
   // sequencer has been started.
 }
