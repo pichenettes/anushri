@@ -330,7 +330,7 @@ void VoiceController::AllNotesOff() {
 void VoiceController::Clock(bool midi_generated) {
   clock_pulse_ = 8;
   voice_.set_lfo_pll_target_phase(lfo_sync_counter_);
-  if (!clock_counter_)
+  if (!clock_counter_) {
     ClockArpeggiator();
     ClockSequencer();
     ClockDrumMachine();
