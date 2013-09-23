@@ -27,3 +27,6 @@
 
 # OS X crap
 .DS_Stor?
+
+# DraftSight crap
+*.bak
