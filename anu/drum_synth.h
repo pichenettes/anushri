@@ -58,6 +58,7 @@ class DrumSynth {
   static void Render();
   static void FillWithSilence();
   static uint32_t idle_time_ms();
+  static bool playing() { return playing_; }
   
  private:
   static void UpdateModulations();
@@ -68,7 +69,9 @@ class DrumSynth {
   static uint8_t sample_;
   static uint8_t sample_counter_;
   static uint8_t sample_rate_;
+  static uint8_t fade_counter_;
   static uint32_t last_event_time_;
+  static bool playing_;
   
   DISALLOW_COPY_AND_ASSIGN(DrumSynth);
 };

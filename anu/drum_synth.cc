@@ -46,6 +46,12 @@ uint8_t DrumSynth::sample_counter_;
 uint8_t DrumSynth::sample_;
 
 /* static */
+uint8_t DrumSynth::fade_counter_;
+
+/* static */
+bool DrumSynth::playing_;
+
+/* static */
 uint32_t DrumSynth::last_event_time_;
 
 static const prog_uint8_t preset_bd_1[] PROGMEM = { 60, 18, 104, 120, 0 };
@@ -106,6 +112,7 @@ void DrumSynth::Trigger(uint8_t instrument, uint8_t level) {
   state_[instrument].amp_env_increment = pgm_read_word(
       lut_res_drm_env_increments + patch_[instrument].amp_decay);
   state_[instrument].level = U8U8MulShift8(level, patch_[instrument].level);
+  playing_ = true;
 }
 
 /* static */
@@ -160,8 +167,16 @@ void DrumSynth::SetBalance(uint8_t mix) {
 
 /* static */
 void DrumSynth::FillWithSilence() {
+  if (sample_) {
+    if (fade_counter_) {
+      --fade_counter_;
+    } else {
+      fade_counter_ = 255;
+      --sample_;
+    }
+  }
   while (audio_buffer.writable()) {
-    audio_buffer.Overwrite(0);
+    audio_buffer.Overwrite(sample_);
   }
 }
 
@@ -214,10 +229,12 @@ void DrumSynth::Render() {
   }
   sample_ = sample;
   sample_counter_ = sample_counter;
+  fade_counter_ = 255;
 }
 
 /* static */
 void DrumSynth::UpdateModulations() {
+  playing_ = false;
   for (uint8_t i = 0; i < kNumDrumInstruments; ++i) {
     // Step amp envelope.
     state_[i].amp_env_phase += state_[i].amp_env_increment;
@@ -247,6 +264,10 @@ void DrumSynth::UpdateModulations() {
     state_[i].phase_increment = InterpolateIncreasing(
         lut_res_drm_phase_increments,
         pitch);
+        
+    if (state_[i].amp_env_increment) {
+      playing_ = true;
+    }
   }
   state_[1].amp_level_noise = U8U8MulShift8(
       state_[1].amp_level,

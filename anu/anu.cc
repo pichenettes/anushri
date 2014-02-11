@@ -248,7 +248,8 @@ int main(void) {
     // - We have received a note message on MIDI channel 10, which is a hint
     //   that an external sequencer might trigger Anushri's drum synth.
     if (voice_controller.has_drums() ||
-        midi_dispatcher.seen_midi_drum_events()) {
+        midi_dispatcher.seen_midi_drum_events() ||
+        drum_synth.playing()) {
       drum_synth.Render();
     } else {
       drum_synth.FillWithSilence();
