@@ -243,22 +243,21 @@ void Voice::WriteDACStateSample() {
   cutoff += S8U8Mul(patch_.cutoff_bias + 128, 64);
   uint16_t growl_amount = mod_wheel_growl;
   growl_amount += mod_wheel_2_;
-  if (mod_aftertoutch_ > 112) {
-    growl_amount += (mod_aftertoutch_ - 112) << 2;
-  }
+  // if (mod_aftertoutch_ > 112) {
+  //   growl_amount += (mod_aftertoutch_ - 112) << 2;
+  // }
   if (growl_amount >= 255) {
     growl_amount = 255;
   }
   cutoff += S16U8MulShift8(vibrato_lfo, growl_amount) >> 3;
   uint16_t env_amount = patch_.cutoff_env_amount + (mod_accent_ >> 1);
+  env_amount += U8U8MulShift8(mod_velocity_, patch_.kbd_velocity_vcf_amount);
   if (env_amount > 255) {
     env_amount = 255;
   }
   cutoff += U16U8MulShift8(vcf_envelope, env_amount) >> 2;
   cutoff += S16U8MulShift8(lfo, patch_.cutoff_lfo_amount) >> 3;
-  cutoff += U8U8Mul(mod_aftertoutch_, 64);
-  cutoff += U8U8Mul(
-      U8U8MulShift8(mod_velocity_, patch_.kbd_velocity_vcf_amount), 48);
+  // cutoff += U8U8Mul(mod_aftertoutch_, 64);
   cutoff = static_cast<int32_t>(cutoff - kVcfCvOffset) * kVcfCvScale >> 16;
   cutoff += 2048;
   CLIP_12(cutoff);
