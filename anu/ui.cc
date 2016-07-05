@@ -277,7 +277,7 @@ void Ui::HandleSwitchEvent(uint8_t index) {
   }
 }
 
-prog_uint8_t pot_to_parameter_map[16 * kNumRows] PROGMEM = {
+const prog_uint8_t pot_to_parameter_map[16 * kNumRows] PROGMEM = {
   // active_row_ == 0
   PARAMETER_GLIDE,
   PARAMETER_VCO_DETUNE,
