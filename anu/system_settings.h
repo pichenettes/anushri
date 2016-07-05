@@ -44,7 +44,7 @@ struct SystemSettingsData {
 };
 
 typedef SystemSettingsData PROGMEM prog_SystemSettingsData;
-extern prog_SystemSettingsData init_settings PROGMEM;
+extern const prog_SystemSettingsData init_settings PROGMEM;
 
 template<>
 struct StorageLayout<SystemSettingsData> {

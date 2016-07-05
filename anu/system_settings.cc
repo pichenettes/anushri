@@ -37,7 +37,7 @@ uint16_t vco_cv_scale_high;
 uint8_t more_padding[3];
 
 /* extern */
-prog_SystemSettingsData init_settings PROGMEM = {
+const prog_SystemSettingsData init_settings PROGMEM = {
   // MIDI channel
   0,
   
